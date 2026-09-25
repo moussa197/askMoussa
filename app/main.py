@@ -3,17 +3,27 @@
 Lancement en local : uvicorn app.main:app --reload
 """
 
+import logging
 from contextlib import asynccontextmanager
 
+import anthropic
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, field_validator
 
-from app.claude_client import ClientClaude
+from app.claude_client import ClientClaude, ReponseClaudeVide
 from app.config import Config, charger_config, lire_origines_cors
 from app.documents import charger_documents
 from app.prompt import construire_prompt_systeme
 from app.rate_limit import LimiteurRequetes, obtenir_ip_client
+
+# Logger déjà configuré par uvicorn : nos lignes ont le même format ("ERROR:    ...")
+# dans le terminal comme sur Render, sans configuration supplémentaire.
+logger = logging.getLogger("uvicorn.error")
+
+# Message unique renvoyé au visiteur quand Claude échoue : on ne révèle jamais
+# la cause (crédit épuisé, clé invalide...), qui renseignerait un attaquant.
+MESSAGE_INDISPONIBLE = "Le service est momentanément indisponible. Réessayez plus tard."
 
 
 @asynccontextmanager
@@ -109,6 +119,24 @@ def obtenir_limiteur(request: Request) -> LimiteurRequetes:
     return request.app.state.limiteur
 
 
+# --- Journalisation ---
+
+
+def journaliser_erreur_claude(erreur: Exception) -> None:
+    """Écrit UNE ligne décrivant la panne : type, statut HTTP, request_id, message de l'API.
+
+    Jamais la question du visiteur, jamais la clé, pas de traceback (erreur connue).
+    Le statut et le request_id n'existent que pour les erreurs où l'API a répondu.
+    """
+    logger.error(
+        "Erreur Claude : %s (statut %s, request_id %s) : %s",
+        type(erreur).__name__,
+        getattr(erreur, "status_code", None),
+        getattr(erreur, "request_id", None),
+        getattr(erreur, "message", str(erreur)),
+    )
+
+
 # --- Routes ---
 
 
@@ -154,5 +182,14 @@ def chat(
             detail="Trop de questions. Réessayez un peu plus tard.",
         )
 
-    reponse = client_claude.demander(prompt_systeme, demande.question)
+    # AnthropicError est la racine de toutes les erreurs du SDK (crédit, clé, timeout,
+    # réseau, surcharge...). Un bug de NOTRE code n'est pas rattrapé : il reste un 500,
+    # pour ne pas cacher de vrais problèmes derrière un 503.
+    try:
+        reponse = client_claude.demander(prompt_systeme, demande.question)
+    except (anthropic.AnthropicError, ReponseClaudeVide) as erreur:
+        journaliser_erreur_claude(erreur)
+        # 503 même si Anthropic renvoie un 429 : ce n'est pas la faute du visiteur.
+        raise HTTPException(status_code=503, detail=MESSAGE_INDISPONIBLE) from None
+
     return ChatResponse(answer=reponse)

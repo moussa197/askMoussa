@@ -29,14 +29,20 @@ CONFIG_TEST = Config(
 
 
 class FauxClientClaude:
-    """Remplace ClientClaude : enregistre les appels et renvoie une réponse fixe."""
+    """Remplace ClientClaude : enregistre les appels et renvoie une réponse fixe.
+
+    Si `erreur` est renseignée, demander() lève cette erreur (simule une panne).
+    """
 
     def __init__(self, reponse="Réponse de test"):
         self.reponse = reponse
+        self.erreur = None
         self.appels = []
 
     def demander(self, system, question):
         self.appels.append({"system": system, "question": question})
+        if self.erreur is not None:
+            raise self.erreur
         return self.reponse
 
 

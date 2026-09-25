@@ -1,15 +1,24 @@
 """Tests de app/main.py avec le TestClient de FastAPI (aucun serveur, aucun réseau)."""
 
+import logging
 from dataclasses import replace
 from unittest.mock import MagicMock
 
 import anthropic
+import httpx2
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.claude_client import ReponseClaudeVide
 from app.config import lire_origines_cors
-from app.main import ajouter_cors, app, obtenir_config, obtenir_limiteur
+from app.main import (
+    MESSAGE_INDISPONIBLE,
+    ajouter_cors,
+    app,
+    obtenir_config,
+    obtenir_limiteur,
+)
 from app.rate_limit import LimiteurRequetes
 from tests.conftest import CONFIG_TEST, PROMPT_TEST
 
@@ -195,6 +204,61 @@ def test_sans_origine_tout_fonctionne(faux_client_claude):
     # Appel sans en-tête Origin (curl, /docs) : le CORS n'intervient pas.
     assert client.get("/health").status_code == 200
     assert client.post("/chat", json={"question": "Q1"}).status_code == 200
+
+
+# --- Erreurs de Claude → 503 (étape 11) ---
+
+# Fausse requête/réponse HTTP pour construire les VRAIES classes d'erreur du SDK.
+# httpx2 est la bibliothèque HTTP du SDK anthropic 1.x (déjà installée avec lui).
+REQUETE_HTTP = httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
+
+
+def erreur_statut(classe, statut, message):
+    """Erreur où l'API a répondu (APIStatusError), avec un request_id reconnaissable."""
+    reponse = httpx2.Response(statut, request=REQUETE_HTTP, headers={"request-id": "req_test_123"})
+    return classe(message, response=reponse, body=None)
+
+
+ERREURS_CLAUDE = {
+    # Le bug observé à l'étape 7 : crédit épuisé.
+    "credit_epuise": lambda: erreur_statut(
+        anthropic.BadRequestError, 400, "Your credit balance is too low to access the Anthropic API."
+    ),
+    "cle_invalide": lambda: erreur_statut(anthropic.AuthenticationError, 401, "invalid x-api-key"),
+    "limite_anthropic": lambda: erreur_statut(anthropic.RateLimitError, 429, "rate limited"),
+    "erreur_serveur": lambda: erreur_statut(anthropic.InternalServerError, 500, "internal error"),
+    "timeout": lambda: anthropic.APITimeoutError(request=REQUETE_HTTP),
+    "reseau": lambda: anthropic.APIConnectionError(request=REQUETE_HTTP),
+    "reponse_vide": lambda: ReponseClaudeVide("La réponse de Claude ne contient aucun texte."),
+}
+
+
+@pytest.mark.parametrize("nom", list(ERREURS_CLAUDE))
+def test_erreur_claude_renvoie_503_neutre(faux_client_claude, nom):
+    faux_client_claude.erreur = ERREURS_CLAUDE[nom]()
+    reponse = client.post("/chat", json={"question": "Quels projets a réalisés Moussa ?"})
+    assert reponse.status_code == 503
+    assert reponse.json() == {"detail": MESSAGE_INDISPONIBLE}
+
+
+def test_journal_utile_mais_sans_la_question(faux_client_claude, caplog):
+    faux_client_claude.erreur = ERREURS_CLAUDE["credit_epuise"]()
+    with caplog.at_level(logging.ERROR):
+        client.post("/chat", json={"question": "QUESTION-SECRETE-123"})
+
+    assert "BadRequestError" in caplog.text
+    assert "req_test_123" in caplog.text
+    assert "credit balance is too low" in caplog.text
+    assert "QUESTION-SECRETE-123" not in caplog.text
+    assert "test-key" not in caplog.text
+
+
+def test_bug_de_notre_code_reste_une_erreur_500(faux_client_claude):
+    # Un bug n'est pas une panne de Claude : il ne doit pas être masqué en 503.
+    faux_client_claude.erreur = RuntimeError("bug inattendu")
+    client_sans_exception = TestClient(app, raise_server_exceptions=False)
+    reponse = client_sans_exception.post("/chat", json={"question": "Q1"})
+    assert reponse.status_code == 500
 
 
 # --- Démarrage (lifespan) ---
