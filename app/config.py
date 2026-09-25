@@ -86,6 +86,14 @@ def lire_origines_cors() -> tuple[str, ...]:
     return tuple(origines)
 
 
+def est_sur_render() -> bool:
+    """Vrai si le serveur tourne sur Render (l'hébergeur y définit la variable RENDER).
+
+    Publique car main.py l'utilise à l'import pour couper /docs en production.
+    """
+    return _lire_texte("RENDER") != ""
+
+
 def _lire_xff_position() -> int | None:
     """Position de l'IP réelle dans X-Forwarded-For. Vide → None (IP de la connexion).
 
@@ -95,7 +103,7 @@ def _lire_xff_position() -> int | None:
     """
     texte = _lire_texte("XFF_POSITION")
     if texte == "":
-        if _lire_texte("RENDER") != "":
+        if est_sur_render():
             raise ValueError(
                 "XFF_POSITION doit être définie sur Render (ex. -1), sinon tous les "
                 "visiteurs partagent la même IP. Voir PLAN.md §4.3."

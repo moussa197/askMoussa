@@ -10,6 +10,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+import app.main as main_module
 from app.claude_client import ReponseClaudeVide
 from app.config import lire_origines_cors
 from app.main import (
@@ -19,6 +20,7 @@ from app.main import (
     app,
     obtenir_config,
     obtenir_limiteur,
+    options_docs,
 )
 from app.rate_limit import LimiteurRequetes
 from tests.conftest import CONFIG_TEST, PROMPT_TEST
@@ -324,6 +326,36 @@ def test_413_garde_les_entetes_cors(faux_client_claude):
     )
     assert reponse.status_code == 413
     assert reponse.headers["access-control-allow-origin"] == "https://moussa197.github.io"
+
+
+# --- Déploiement : /docs coupé en production, diagnostic IP (étape 13) ---
+
+
+def test_docs_coupees_en_production():
+    # Mini-application construite avec les options de production.
+    mini_app = FastAPI(**options_docs(en_production=True))
+    mini_client = TestClient(mini_app)
+    for chemin in ["/docs", "/redoc", "/openapi.json"]:
+        assert mini_client.get(chemin).status_code == 404
+
+
+def test_docs_disponibles_en_local():
+    assert options_docs(en_production=False) == {}
+    assert client.get("/docs").status_code == 200
+
+
+def test_diagnostic_ip_active(monkeypatch, caplog):
+    monkeypatch.setattr(main_module, "DIAGNOSTIC_IP", True)
+    with caplog.at_level(logging.WARNING):
+        client.get("/health", headers={"X-Forwarded-For": "1.2.3.4"})
+    assert "Diagnostic IP" in caplog.text
+    assert "1.2.3.4" in caplog.text
+
+
+def test_diagnostic_ip_inactif_par_defaut(caplog):
+    with caplog.at_level(logging.WARNING):
+        client.get("/health", headers={"X-Forwarded-For": "1.2.3.4"})
+    assert "Diagnostic IP" not in caplog.text
 
 
 # --- Démarrage (lifespan) ---

@@ -8,9 +8,13 @@ Limite connue : les compteurs repartent à zéro à chaque redémarrage du serve
 (voir PLAN.md §4.3). Il faut un seul worker uvicorn pour qu'ils soient partagés.
 """
 
+import logging
 import threading
 import time
 from collections import deque
+
+# Même logger que main.py : les lignes ont le format d'uvicorn ("WARNING:  ...").
+logger = logging.getLogger("uvicorn.error")
 
 UNE_MINUTE = 60
 UN_JOUR = 24 * 60 * 60
@@ -104,4 +108,12 @@ def obtenir_ip_client(request, xff_position: int | None) -> str:
     try:
         return ips[xff_position]
     except IndexError:
+        # Signe d'une XFF_POSITION mal réglée : tous ces visiteurs partageraient l'IP
+        # du répartiteur de charge. On note seulement le nombre d'éléments, pas les IP.
+        logger.warning(
+            "XFF_POSITION=%s hors limites : X-Forwarded-For ne contient que %d élément(s). "
+            "IP de la connexion utilisée.",
+            xff_position,
+            len(ips),
+        )
         return ip_connexion

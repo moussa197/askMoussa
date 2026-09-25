@@ -1,5 +1,6 @@
 """Tests de app/rate_limit.py avec une fausse horloge (aucun sleep, tests instantanés)."""
 
+import logging
 from types import SimpleNamespace
 
 import pytest
@@ -142,9 +143,13 @@ def test_ip_selon_la_position(position, attendu):
     assert obtenir_ip_client(requete, position) == attendu
 
 
-def test_ip_position_hors_limites():
+def test_ip_position_hors_limites(caplog):
     requete = fausse_requete(xff="1.2.3.4")
-    assert obtenir_ip_client(requete, -3) == "5.5.5.5"
+    with caplog.at_level(logging.WARNING):
+        assert obtenir_ip_client(requete, -3) == "5.5.5.5"
+    # Un avertissement signale la mauvaise position, sans écrire les IP.
+    assert "hors limites" in caplog.text
+    assert "1.2.3.4" not in caplog.text
 
 
 def test_ip_plusieurs_lignes_x_forwarded_for():

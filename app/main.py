@@ -4,6 +4,7 @@ Lancement en local : uvicorn app.main:app --reload
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 import anthropic
@@ -14,7 +15,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
 
 from app.claude_client import ClientClaude, ReponseClaudeVide
-from app.config import Config, charger_config, lire_origines_cors
+from app.config import Config, charger_config, est_sur_render, lire_origines_cors
 from app.documents import charger_documents
 from app.limite_corps import LimiteTailleCorps
 from app.prompt import construire_prompt_systeme
@@ -70,8 +71,24 @@ def ajouter_cors(app: FastAPI, origines) -> None:
     )
 
 
+def options_docs(en_production: bool) -> dict:
+    """Options de FastAPI pour /docs, /redoc et /openapi.json.
+
+    En production, on les coupe : la page Swagger publique offrirait un formulaire
+    tout prêt pour envoyer des questions. En local, on les garde pour tester.
+    """
+    if en_production:
+        return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    return {}
+
+
+# DIAGNOSTIC TEMPORAIRE (étape 13, PLAN.md §4.3) : à supprimer après la mesure
+# de XFF_POSITION. Activé par la variable DIAGNOSTIC_IP (lue une fois au démarrage).
+DIAGNOSTIC_IP = os.environ.get("DIAGNOSTIC_IP", "").strip() != ""
+
+
 # Objet application que lance uvicorn ("app.main:app").
-app = FastAPI(title="Ask Moussa", lifespan=lifespan)
+app = FastAPI(title="Ask Moussa", lifespan=lifespan, **options_docs(est_sur_render()))
 # Les middlewares doivent être ajoutés AVANT le démarrage (donc pas dans lifespan).
 # Le dernier ajouté est le plus externe : la limite de taille est ajoutée avant le CORS,
 # pour que le CORS l'enveloppe et que la réponse 413 garde ses en-têtes CORS.
@@ -168,7 +185,7 @@ def journaliser_erreur_claude(erreur: Exception) -> None:
 
 
 @app.get("/health")
-async def health():
+async def health(request: Request):
     """Route de santé appelée par Render pour vérifier que le service est vivant.
 
     Elle ne fait volontairement rien d'autre : pas d'appel à Claude (coûteux),
@@ -178,7 +195,23 @@ async def health():
     pas besoin d'un thread. Même si tous les threads sont occupés par des appels
     à Claude, /health répond toujours, et Render ne croit pas le service en panne.
     """
+    if DIAGNOSTIC_IP:
+        journaliser_diagnostic_ip(request)
     return {"status": "ok"}
+
+
+def journaliser_diagnostic_ip(request: Request) -> None:
+    """DIAGNOSTIC TEMPORAIRE : écrit les en-têtes d'IP reçus, pour mesurer XFF_POSITION.
+
+    Appelé seulement depuis /health, qui ne reçoit jamais de question.
+    """
+    logger.warning(
+        "Diagnostic IP : x-forwarded-for=%r | cf-connecting-ip=%r | true-client-ip=%r | connexion=%s",
+        request.headers.getlist("x-forwarded-for"),
+        request.headers.get("cf-connecting-ip"),
+        request.headers.get("true-client-ip"),
+        request.client.host if request.client else None,
+    )
 
 
 @app.post(

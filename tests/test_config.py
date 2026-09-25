@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.config import ORIGINE_PORTFOLIO, charger_config
+from app.config import ORIGINE_PORTFOLIO, charger_config, est_sur_render
 
 # Toutes les variables lues par config.py.
 VARIABLES = [
@@ -104,6 +104,12 @@ def test_xff_position_invalide(monkeypatch):
     monkeypatch.setenv("XFF_POSITION", "abc")
     with pytest.raises(ValueError, match="XFF_POSITION"):
         charger_config()
+
+
+def test_detection_de_render(monkeypatch):
+    assert est_sur_render() is False  # RENDER effacée par la fixture
+    monkeypatch.setenv("RENDER", "true")
+    assert est_sur_render() is True
 
 
 def test_xff_position_obligatoire_sur_render(monkeypatch):
