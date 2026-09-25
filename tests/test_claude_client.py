@@ -12,20 +12,8 @@ from app.claude_client import (
     ClientClaude,
     ReponseClaudeVide,
 )
-from app.config import Config
 from app.prompt import baliser_question
-
-CONFIG_TEST = Config(
-    anthropic_api_key="test-key",
-    claude_model="claude-haiku-4-5",
-    claude_max_tokens=400,
-    max_question_length=500,
-    rate_limit_par_minute=10,
-    rate_limit_par_jour=30,
-    plafond_global_jour=300,
-    cors_origines=("https://moussa197.github.io",),
-    xff_position=None,
-)
+from tests.conftest import CONFIG_TEST
 
 
 def faux_client(*blocs):

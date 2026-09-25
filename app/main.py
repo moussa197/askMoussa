@@ -5,11 +5,11 @@ Lancement en local : uvicorn app.main:app --reload
 
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Request
-from pydantic import BaseModel
+from fastapi import Depends, FastAPI, HTTPException, Request
+from pydantic import BaseModel, field_validator
 
 from app.claude_client import ClientClaude
-from app.config import charger_config
+from app.config import Config, charger_config
 from app.documents import charger_documents
 from app.prompt import construire_prompt_systeme
 
@@ -22,6 +22,7 @@ async def lifespan(app: FastAPI):
     mieux vaut un crash visible qu'un chatbot qui ne marche pas.
     """
     config = charger_config()
+    app.state.config = config
     # Le prompt système est construit une fois, pas à chaque question.
     app.state.prompt_systeme = construire_prompt_systeme(charger_documents())
     app.state.client_claude = ClientClaude(config)
@@ -40,6 +41,18 @@ class ChatRequest(BaseModel):
 
     question: str
 
+    @field_validator("question")
+    @classmethod
+    def retirer_espaces_et_refuser_vide(cls, valeur: str) -> str:
+        """Retire les espaces autour ; une question vide ou faite d'espaces → 422.
+
+        La longueur max, elle, dépend de la config : elle est vérifiée dans la route.
+        """
+        valeur = valeur.strip()
+        if valeur == "":
+            raise ValueError("La question ne doit pas être vide.")
+        return valeur
+
 
 class ChatResponse(BaseModel):
     """Corps renvoyé par POST /chat."""
@@ -48,6 +61,11 @@ class ChatResponse(BaseModel):
 
 
 # --- Dépendances : remplacées par des faux dans les tests (app.dependency_overrides) ---
+
+
+def obtenir_config(request: Request) -> Config:
+    """Renvoie la configuration chargée au démarrage."""
+    return request.app.state.config
 
 
 def obtenir_client_claude(request: Request) -> ClientClaude:
@@ -76,6 +94,7 @@ def health():
 @app.post("/chat", response_model=ChatResponse)
 def chat(
     demande: ChatRequest,
+    config: Config = Depends(obtenir_config),
     client_claude: ClientClaude = Depends(obtenir_client_claude),
     prompt_systeme: str = Depends(obtenir_prompt_systeme),
 ):
@@ -85,5 +104,13 @@ def chat(
     Avec "def", FastAPI l'exécute dans un thread à part, et le serveur continue
     de répondre aux autres visiteurs pendant ce temps.
     """
+    # Vérifiée AVANT l'appel à Claude : une question trop longue ne coûte rien.
+    # (La question a déjà été débarrassée de ses espaces autour par ChatRequest.)
+    if len(demande.question) > config.max_question_length:
+        raise HTTPException(
+            status_code=422,
+            detail=f"La question ne doit pas dépasser {config.max_question_length} caractères.",
+        )
+
     reponse = client_claude.demander(prompt_systeme, demande.question)
     return ChatResponse(answer=reponse)
