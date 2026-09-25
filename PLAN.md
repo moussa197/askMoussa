@@ -118,7 +118,7 @@ askMoussa/
 1. `config.py` charge `.env` (sans effet sur Render) et lit les variables. Si la clé manque ou si `*` apparaît dans les origines CORS → erreur claire.
 2. `documents.py` lit **exactement** `data/cv.md`, `data/faq.md` et `data/projets.md`. Les noms sont en minuscules, le chemin est construit avec `pathlib` depuis l'emplacement du fichier Python, et la lecture se fait en UTF-8. Le module retire les commentaires `<!-- ... -->` et renvoie `[{"source": "cv.md", "contenu": "..."}, ...]`. Si un fichier manque, le serveur s'arrête avec une erreur explicite : mieux vaut un crash visible qu'un chatbot sans connaissances.
 3. `prompt.py` construit le prompt système : les règles, puis les documents entre balises `<document source="cv.md"> ... </document>`.
-4. `claude_client.py` crée **un seul** client Anthropic (`timeout` d'environ 30 s, `max_retries=2`).
+4. `claude_client.py` crée **un seul** client Anthropic (`timeout=20` s, `max_retries=1` : attente max d'environ 40 s pour le visiteur, décidé à l'étape 6).
 5. `main.py` crée l'application, ajoute le CORS et déclare les routes.
 
 ### 4.2 Quand un visiteur pose une question
