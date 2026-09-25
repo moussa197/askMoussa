@@ -3,7 +3,14 @@
 import pytest
 
 from app.config import Config
-from app.main import app, obtenir_client_claude, obtenir_config, obtenir_prompt_systeme
+from app.main import (
+    app,
+    obtenir_client_claude,
+    obtenir_config,
+    obtenir_limiteur,
+    obtenir_prompt_systeme,
+)
+from app.rate_limit import LimiteurRequetes
 
 PROMPT_TEST = "PROMPT SYSTÈME DE TEST"
 
@@ -35,8 +42,8 @@ class FauxClientClaude:
 
 @pytest.fixture
 def faux_client_claude():
-    """Installe le faux client, un faux prompt et la config de test dans l'app,
-    puis nettoie après le test.
+    """Installe le faux client, un faux prompt, la config de test et un limiteur
+    NEUF (compteurs à zéro) dans l'app, puis nettoie après le test.
 
     Note : TestClient(app) utilisé SANS "with" ne lance pas le lifespan,
     donc ni vraie clé ni vrai client ne sont nécessaires.
@@ -45,5 +52,11 @@ def faux_client_claude():
     app.dependency_overrides[obtenir_client_claude] = lambda: faux
     app.dependency_overrides[obtenir_prompt_systeme] = lambda: PROMPT_TEST
     app.dependency_overrides[obtenir_config] = lambda: CONFIG_TEST
+    limiteur = LimiteurRequetes(
+        par_minute=CONFIG_TEST.rate_limit_par_minute,
+        par_jour=CONFIG_TEST.rate_limit_par_jour,
+        plafond_global=CONFIG_TEST.plafond_global_jour,
+    )
+    app.dependency_overrides[obtenir_limiteur] = lambda: limiteur
     yield faux
     app.dependency_overrides.clear()

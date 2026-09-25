@@ -7,7 +7,8 @@ import anthropic
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app, obtenir_config
+from app.main import app, obtenir_config, obtenir_limiteur
+from app.rate_limit import LimiteurRequetes
 from tests.conftest import CONFIG_TEST, PROMPT_TEST
 
 # Sans "with", le lifespan n'est pas lancé : pas besoin de clé ni de documents.
@@ -90,6 +91,41 @@ def test_limite_lue_dans_la_config(faux_client_claude):
     assert client.post("/chat", json={"question": "a" * 11}).status_code == 422
 
 
+# --- Rate limiting (étape 9) ---
+
+
+def installer_limiteur(par_minute):
+    """Remplace le limiteur de la fixture par un limiteur plus strict."""
+    limiteur = LimiteurRequetes(par_minute=par_minute, par_jour=30, plafond_global=300)
+    app.dependency_overrides[obtenir_limiteur] = lambda: limiteur
+
+
+def test_trop_de_questions_renvoie_429(faux_client_claude):
+    installer_limiteur(par_minute=2)
+    assert client.post("/chat", json={"question": "Q1"}).status_code == 200
+    assert client.post("/chat", json={"question": "Q2"}).status_code == 200
+
+    reponse = client.post("/chat", json={"question": "Q3"})
+    assert reponse.status_code == 429
+    assert reponse.json() == {"detail": "Trop de questions. Réessayez un peu plus tard."}
+    assert len(faux_client_claude.appels) == 2  # Claude n'a pas été appelé pour Q3
+
+
+def test_question_invalide_ne_consomme_pas_de_quota(faux_client_claude):
+    installer_limiteur(par_minute=1)
+    assert client.post("/chat", json={"question": "   "}).status_code == 422
+    assert client.post("/chat", json={"question": "a" * 501}).status_code == 422
+    # Le seul quota disponible est encore là.
+    assert client.post("/chat", json={"question": "Q1"}).status_code == 200
+
+
+def test_health_jamais_limitee(faux_client_claude):
+    installer_limiteur(par_minute=1)
+    client.post("/chat", json={"question": "Q1"})
+    for _ in range(20):
+        assert client.get("/health").status_code == 200
+
+
 # --- Démarrage (lifespan) ---
 
 
@@ -104,6 +140,7 @@ def test_demarrage_prepare_prompt_et_client(monkeypatch):
         assert '<document source="projets.md">' in app.state.prompt_systeme
         assert app.state.client_claude is not None
         assert app.state.config.anthropic_api_key == "test-key"
+        assert isinstance(app.state.limiteur, LimiteurRequetes)
 
 
 def test_demarrage_echoue_sans_cle(monkeypatch):

@@ -12,6 +12,7 @@ from app.claude_client import ClientClaude
 from app.config import Config, charger_config
 from app.documents import charger_documents
 from app.prompt import construire_prompt_systeme
+from app.rate_limit import LimiteurRequetes, obtenir_ip_client
 
 
 @asynccontextmanager
@@ -26,6 +27,12 @@ async def lifespan(app: FastAPI):
     # Le prompt système est construit une fois, pas à chaque question.
     app.state.prompt_systeme = construire_prompt_systeme(charger_documents())
     app.state.client_claude = ClientClaude(config)
+    # Un seul limiteur pour tout le serveur (d'où un seul worker uvicorn).
+    app.state.limiteur = LimiteurRequetes(
+        par_minute=config.rate_limit_par_minute,
+        par_jour=config.rate_limit_par_jour,
+        plafond_global=config.plafond_global_jour,
+    )
     yield  # le serveur tourne ; rien à nettoyer à l'arrêt
 
 
@@ -78,6 +85,11 @@ def obtenir_prompt_systeme(request: Request) -> str:
     return request.app.state.prompt_systeme
 
 
+def obtenir_limiteur(request: Request) -> LimiteurRequetes:
+    """Renvoie le limiteur de requêtes créé au démarrage."""
+    return request.app.state.limiteur
+
+
 # --- Routes ---
 
 
@@ -94,9 +106,11 @@ def health():
 @app.post("/chat", response_model=ChatResponse)
 def chat(
     demande: ChatRequest,
+    request: Request,
     config: Config = Depends(obtenir_config),
     client_claude: ClientClaude = Depends(obtenir_client_claude),
     prompt_systeme: str = Depends(obtenir_prompt_systeme),
+    limiteur: LimiteurRequetes = Depends(obtenir_limiteur),
 ):
     """Répond à une question sur Moussa à partir des documents de data/.
 
@@ -110,6 +124,15 @@ def chat(
         raise HTTPException(
             status_code=422,
             detail=f"La question ne doit pas dépasser {config.max_question_length} caractères.",
+        )
+
+    # Rate limit juste avant Claude : seules les questions valides consomment du quota.
+    # Message neutre : on ne dit pas laquelle des 3 limites est atteinte.
+    ip = obtenir_ip_client(request, config.xff_position)
+    if not limiteur.autoriser(ip):
+        raise HTTPException(
+            status_code=429,
+            detail="Trop de questions. Réessayez un peu plus tard.",
         )
 
     reponse = client_claude.demander(prompt_systeme, demande.question)
