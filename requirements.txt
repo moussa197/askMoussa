@@ -1,0 +1,8 @@
+# Dépendances de production (installées sur Render).
+# Seules les dépendances directes sont fixées ; pip choisit les sous-dépendances
+# (pydantic, starlette, httpx...) dans des plages compatibles.
+
+fastapi==0.141.1        # Framework web : routes, validation JSON, CORS
+uvicorn==0.53.0         # Serveur ASGI (sans [standard] pour économiser la RAM)
+anthropic==1.8.0        # SDK officiel de l'API Claude
+python-dotenv==1.2.3    # Lecture du fichier .env en local
