@@ -96,6 +96,12 @@ class ChatResponse(BaseModel):
     answer: str
 
 
+class MessageErreur(BaseModel):
+    """Corps des erreurs levées par la route (429, 503) : {"detail": "..."}."""
+
+    detail: str
+
+
 # --- Dépendances : remplacées par des faux dans les tests (app.dependency_overrides) ---
 
 
@@ -150,7 +156,16 @@ def health():
     return {"status": "ok"}
 
 
-@app.post("/chat", response_model=ChatResponse)
+@app.post(
+    "/chat",
+    response_model=ChatResponse,
+    # Réponses levées par HTTPException dans la route : FastAPI ne peut pas les deviner,
+    # on les déclare pour qu'elles apparaissent dans /docs (et non en "Undocumented").
+    responses={
+        429: {"model": MessageErreur, "description": "Trop de questions (limite par IP ou plafond global)"},
+        503: {"model": MessageErreur, "description": "Claude est momentanément indisponible"},
+    },
+)
 def chat(
     demande: ChatRequest,
     request: Request,

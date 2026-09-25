@@ -261,6 +261,13 @@ def test_bug_de_notre_code_reste_une_erreur_500(faux_client_claude):
     assert reponse.status_code == 500
 
 
+def test_reponses_429_et_503_documentees():
+    # Elles doivent apparaître dans /docs (schéma OpenAPI), et non en "Undocumented".
+    reponses = client.get("/openapi.json").json()["paths"]["/chat"]["post"]["responses"]
+    assert "429" in reponses
+    assert "503" in reponses
+
+
 # --- Démarrage (lifespan) ---
 
 
