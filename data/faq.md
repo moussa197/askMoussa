@@ -9,7 +9,7 @@ Moussa recherche un stage ou une alternance pour contribuer au développement d'
 - Type de contrat précis et rythme d'alternance : alternance 1 semaine école / 3 semaines entreprise ?
 - Période ou date de début :  31 Mai
 - Durée du stage souhaitée : 27 Aout
-- Lieu : [À COMPLÉTER : Angers ? mobile en France ? télétravail possible ?]
+- Lieu : Partout dans la France il n'a pas de soucis avec ça mais il aurait plus de preference pour Angers et Paris 
 
 ## Pourquoi l'informatique et l'IA ?
 Depuis tout petit, Moussa est passionné de jeux vidéo. Enfant, il voyait souvent le logo Java s'afficher au lancement de certains jeux, notamment le célèbre jeu Snake. Il s'est demandé ce qui se cachait derrière ce logo et comment on fabriquait un jeu : c'est ce qui a éveillé sa curiosité pour la programmation. En grandissant, il a été fasciné par le concept d'intelligence artificielle, des programmes capables d'apprendre et de prendre des décisions, et il a décidé de se lancer dans ce domaine.
