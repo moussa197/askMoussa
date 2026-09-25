@@ -67,10 +67,12 @@ def _lire_cle_api() -> str:
     return cle
 
 
-def _lire_origines_cors() -> tuple[str, ...]:
+def lire_origines_cors() -> tuple[str, ...]:
     """Portfolio + origines de dev de CORS_ORIGINES_DEV (séparées par des virgules).
 
     Toute origine contenant "*" est refusée : on ne veut jamais ouvrir l'API à tous.
+    Publique (sans "_") car main.py l'appelle à l'import pour configurer le CORS :
+    le middleware doit être ajouté avant le démarrage, et cette lecture n'exige pas la clé.
     """
     origines = [ORIGINE_PORTFOLIO]
     for morceau in _lire_texte("CORS_ORIGINES_DEV").split(","):
@@ -110,6 +112,6 @@ def charger_config() -> Config:
         rate_limit_par_minute=_lire_entier_positif("RATE_LIMIT_PAR_MINUTE", 10),
         rate_limit_par_jour=_lire_entier_positif("RATE_LIMIT_PAR_JOUR", 30),
         plafond_global_jour=_lire_entier_positif("PLAFOND_GLOBAL_JOUR", 300),
-        cors_origines=_lire_origines_cors(),
+        cors_origines=lire_origines_cors(),
         xff_position=_lire_xff_position(),
     )

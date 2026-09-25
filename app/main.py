@@ -6,10 +6,11 @@ Lancement en local : uvicorn app.main:app --reload
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, field_validator
 
 from app.claude_client import ClientClaude
-from app.config import Config, charger_config
+from app.config import Config, charger_config, lire_origines_cors
 from app.documents import charger_documents
 from app.prompt import construire_prompt_systeme
 from app.rate_limit import LimiteurRequetes, obtenir_ip_client
@@ -36,8 +37,26 @@ async def lifespan(app: FastAPI):
     yield  # le serveur tourne ; rien à nettoyer à l'arrêt
 
 
+def ajouter_cors(app: FastAPI, origines) -> None:
+    """Autorise uniquement ces origines à appeler l'API depuis un navigateur.
+
+    Jamais "*" (refusé par lire_origines_cors). Pas de cookies (allow_credentials
+    reste à False). Rappel : le CORS ne protège pas contre curl ou un script,
+    d'où la limite de longueur et le rate limit.
+    """
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(origines),
+        allow_methods=["GET", "POST"],  # POST /chat ; GET /health (réveil du serveur)
+        allow_headers=["Content-Type"],  # le seul en-tête envoyé par le widget
+    )
+
+
 # Objet application que lance uvicorn ("app.main:app").
 app = FastAPI(title="Ask Moussa", lifespan=lifespan)
+# Le middleware doit être ajouté AVANT le démarrage (donc pas dans lifespan) :
+# on lit ici les origines, ce qui n'exige pas la clé API.
+ajouter_cors(app, lire_origines_cors())
 
 
 # --- Schémas de données (validés automatiquement par pydantic) ---

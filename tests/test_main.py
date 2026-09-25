@@ -5,9 +5,11 @@ from unittest.mock import MagicMock
 
 import anthropic
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.main import app, obtenir_config, obtenir_limiteur
+from app.config import lire_origines_cors
+from app.main import ajouter_cors, app, obtenir_config, obtenir_limiteur
 from app.rate_limit import LimiteurRequetes
 from tests.conftest import CONFIG_TEST, PROMPT_TEST
 
@@ -124,6 +126,75 @@ def test_health_jamais_limitee(faux_client_claude):
     client.post("/chat", json={"question": "Q1"})
     for _ in range(20):
         assert client.get("/health").status_code == 200
+
+
+# --- CORS (étape 10) ---
+
+PORTFOLIO = "https://moussa197.github.io"
+
+
+def pre_vol(client_test, origine):
+    """Imite la requête OPTIONS qu'envoie le navigateur avant un POST JSON."""
+    return client_test.options(
+        "/chat",
+        headers={
+            "Origin": origine,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+
+def test_pre_vol_depuis_le_portfolio_autorise():
+    reponse = pre_vol(client, PORTFOLIO)
+    assert reponse.status_code == 200
+    assert reponse.headers["access-control-allow-origin"] == PORTFOLIO
+
+
+def test_pre_vol_depuis_un_autre_site_refuse():
+    reponse = pre_vol(client, "https://exemple.com")
+    assert reponse.status_code == 400
+    assert "access-control-allow-origin" not in reponse.headers
+
+
+def test_post_depuis_un_autre_site_sans_autorisation(faux_client_claude):
+    reponse = client.post(
+        "/chat", json={"question": "Q1"}, headers={"Origin": "https://exemple.com"}
+    )
+    # Le navigateur empêcherait le site de lire cette réponse.
+    assert "access-control-allow-origin" not in reponse.headers
+
+
+def test_post_depuis_le_portfolio_autorise(faux_client_claude):
+    reponse = client.post("/chat", json={"question": "Q1"}, headers={"Origin": PORTFOLIO})
+    assert reponse.status_code == 200
+    assert reponse.headers["access-control-allow-origin"] == PORTFOLIO  # jamais "*"
+
+
+def test_origine_de_dev_configuree_autorisee(monkeypatch):
+    monkeypatch.setenv("CORS_ORIGINES_DEV", "http://localhost:5500")
+    # Mini-application avec la même fonction ajouter_cors, sans recharger main.py.
+    mini_app = FastAPI()
+
+    @mini_app.post("/chat")
+    def chat_factice():
+        return {}
+
+    ajouter_cors(mini_app, lire_origines_cors())
+    mini_client = TestClient(mini_app)
+
+    reponse = pre_vol(mini_client, "http://localhost:5500")
+    assert reponse.status_code == 200
+    assert reponse.headers["access-control-allow-origin"] == "http://localhost:5500"
+    # Le portfolio reste autorisé, un autre site reste refusé.
+    assert pre_vol(mini_client, PORTFOLIO).status_code == 200
+    assert pre_vol(mini_client, "https://exemple.com").status_code == 400
+
+
+def test_sans_origine_tout_fonctionne(faux_client_claude):
+    # Appel sans en-tête Origin (curl, /docs) : le CORS n'intervient pas.
+    assert client.get("/health").status_code == 200
+    assert client.post("/chat", json={"question": "Q1"}).status_code == 200
 
 
 # --- Démarrage (lifespan) ---
