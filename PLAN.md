@@ -192,6 +192,22 @@ Les étapes 4, 5 et 6 sont les trois lettres de **RAG** : *Retrieval* (on récup
    - si Render a remplacé `1.2.3.4` par la vraie IP en première position, le premier élément est fiable.
 4. On règle `XFF_POSITION` (ex. `-1` = dernier, `-2` = avant-dernier, `0` = premier), puis on retire le journal temporaire.
 
+**Résultat de la mesure (étape 13) : `XFF_POSITION=-3`.** Trois appels à `/health` (sans en-tête, avec un faux `X-Forwarded-For: 1.2.3.4`, avec deux fausses lignes) ont montré, toujours dans cet ordre :
+
+```
+X-Forwarded-For: [valeurs inventées par le visiteur…], IP réelle, IP Cloudflare, IP interne Render
+                                                        (-3)       (-2)           (-1)
+```
+
+- Render **ne nettoie pas** l'en-tête : les valeurs du visiteur restent **au début**. La position `0` serait donc falsifiable.
+- L'IP réelle, ajoutée par Cloudflare, est toujours en **-3**, confirmée par les en-têtes `CF-Connecting-IP` et `True-Client-IP`. Les IP en -2 et -1 changent d'un appel à l'autre, mais pas leur nombre.
+- Le séparateur n'est pas toujours `", "` (parfois `","`) : le découpage sur `,` suivi d'un `strip()` gère les deux.
+- Deux lignes `X-Forwarded-For` envoyées par le visiteur sont **fusionnées** par Cloudflare en une seule.
+- **La connexion arrive de `127.0.0.1`** (proxy de Render). Or uvicorn fait confiance par défaut à `127.0.0.1` pour interpréter `X-Forwarded-For` : le `--no-proxy-headers` de la commande de lancement est donc **indispensable** pour que seul notre code choisisse l'IP.
+- Les vérifications internes de Render appellent `/health` sans `X-Forwarded-For` (connexion depuis `10.x.x.x`).
+
+Ces en-têtes réels sont rejoués dans `tests/test_rate_limit.py`, avec l'IP de documentation `203.0.113.7`. Si Render change un jour son nombre d'intermédiaires, la position -3 ne sera plus juste : avec un intermédiaire de plus, elle tomberait sur une IP de Cloudflare (partagée par beaucoup de visiteurs, d'où des 429 inattendus) ; avec un de moins, sur une valeur choisie par le visiteur. Signes à surveiller : des 429 anormaux, ou l'avertissement « XFF_POSITION hors limites ». Il faudra alors refaire la mesure (en remettant temporairement un diagnostic). Le code de diagnostic temporaire a été supprimé après la mesure.
+
 Le code (étape 9) contient donc une fonction `obtenir_ip_client(request)` qui lit la position configurée, et `request.client.host` en secours si l'en-tête est absent (en local). **Le plafond global de 300 questions par jour** limite les abus de toute façon, même si une IP est usurpée.
 
 **Limite connue du limiteur en mémoire.** Les compteurs repartent à zéro à chaque redémarrage. Or l'offre gratuite de Render met le service en veille après environ 15 min d'inactivité. Les limites « par jour » sont donc approximatives. **La limite de dépense mensuelle dans la console Anthropic reste le vrai filet de sécurité.**

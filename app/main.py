@@ -4,7 +4,6 @@ Lancement en local : uvicorn app.main:app --reload
 """
 
 import logging
-import os
 from contextlib import asynccontextmanager
 
 import anthropic
@@ -80,11 +79,6 @@ def options_docs(en_production: bool) -> dict:
     if en_production:
         return {"docs_url": None, "redoc_url": None, "openapi_url": None}
     return {}
-
-
-# DIAGNOSTIC TEMPORAIRE (étape 13, PLAN.md §4.3) : à supprimer après la mesure
-# de XFF_POSITION. Activé par la variable DIAGNOSTIC_IP (lue une fois au démarrage).
-DIAGNOSTIC_IP = os.environ.get("DIAGNOSTIC_IP", "").strip() != ""
 
 
 # Objet application que lance uvicorn ("app.main:app").
@@ -185,7 +179,7 @@ def journaliser_erreur_claude(erreur: Exception) -> None:
 
 
 @app.get("/health")
-async def health(request: Request):
+async def health():
     """Route de santé appelée par Render pour vérifier que le service est vivant.
 
     Elle ne fait volontairement rien d'autre : pas d'appel à Claude (coûteux),
@@ -195,23 +189,7 @@ async def health(request: Request):
     pas besoin d'un thread. Même si tous les threads sont occupés par des appels
     à Claude, /health répond toujours, et Render ne croit pas le service en panne.
     """
-    if DIAGNOSTIC_IP:
-        journaliser_diagnostic_ip(request)
     return {"status": "ok"}
-
-
-def journaliser_diagnostic_ip(request: Request) -> None:
-    """DIAGNOSTIC TEMPORAIRE : écrit les en-têtes d'IP reçus, pour mesurer XFF_POSITION.
-
-    Appelé seulement depuis /health, qui ne reçoit jamais de question.
-    """
-    logger.warning(
-        "Diagnostic IP : x-forwarded-for=%r | cf-connecting-ip=%r | true-client-ip=%r | connexion=%s",
-        request.headers.getlist("x-forwarded-for"),
-        request.headers.get("cf-connecting-ip"),
-        request.headers.get("true-client-ip"),
-        request.client.host if request.client else None,
-    )
 
 
 @app.post(

@@ -152,6 +152,35 @@ def test_ip_position_hors_limites(caplog):
     assert "1.2.3.4" not in caplog.text
 
 
+# En-têtes réellement reçus sur Render (mesure de l'étape 13, PLAN.md §4.3).
+# Chaîne : [valeurs inventées par le visiteur…], IP réelle (ajoutée par Cloudflare),
+# IP Cloudflare → Render, IP interne de Render. IP réelle remplacée par une IP de
+# documentation (203.0.113.7, réservée par la RFC 5737). Toujours en position -3.
+IP_REELLE = "203.0.113.7"
+ENTETES_RENDER = [
+    # sans en-tête envoyé par le visiteur
+    f"{IP_REELLE}, 162.158.95.136, 10.25.225.133",
+    # avec un faux "X-Forwarded-For: 1.2.3.4" (séparateur "," sans espace)
+    f"1.2.3.4,{IP_REELLE}, 172.71.126.191, 10.25.225.133",
+    # avec deux fausses lignes, fusionnées par Cloudflare en une seule
+    f"1.2.3.4, 5.6.7.8,{IP_REELLE}, 104.23.225.10, 10.27.176.24",
+]
+
+
+@pytest.mark.parametrize("entete", ENTETES_RENDER)
+def test_ip_reelle_derriere_render_en_position_moins_3(entete):
+    # La connexion vient de 127.0.0.1 : c'est le proxy de Render (constaté à la mesure).
+    requete = fausse_requete(xff=entete, ip_connexion="127.0.0.1")
+    assert obtenir_ip_client(requete, -3) == IP_REELLE
+
+
+def test_ip_falsifiee_ignoree_derriere_render():
+    # Le premier élément est choisi par le visiteur : la position 0 serait falsifiable.
+    requete = fausse_requete(xff=ENTETES_RENDER[1], ip_connexion="127.0.0.1")
+    assert obtenir_ip_client(requete, 0) == "1.2.3.4"  # d'où le choix de -3
+    assert obtenir_ip_client(requete, -3) == IP_REELLE
+
+
 def test_ip_plusieurs_lignes_x_forwarded_for():
     # Le visiteur envoie sa propre ligne, le proxy en ajoute une seconde :
     # -1 doit désigner l'IP ajoutée par le proxy, pas celle du visiteur.
