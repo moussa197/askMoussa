@@ -93,7 +93,10 @@ def obtenir_ip_client(request, xff_position: int | None) -> str:
     if xff_position is None:
         return ip_connexion
 
-    entete = request.headers.get("x-forwarded-for")
+    # getlist : si un proxy a ajouté une DEUXIÈME ligne X-Forwarded-For au lieu de
+    # compléter la première, get() ne lirait que la première, celle du visiteur
+    # (donc falsifiable). On recolle toutes les lignes dans l'ordre.
+    entete = ", ".join(request.headers.getlist("x-forwarded-for"))
     if not entete:
         return ip_connexion
 

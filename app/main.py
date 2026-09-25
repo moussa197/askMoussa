@@ -8,7 +8,9 @@ from contextlib import asynccontextmanager
 
 import anthropic
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
 
 from app.claude_client import ClientClaude, ReponseClaudeVide
@@ -25,6 +27,11 @@ logger = logging.getLogger("uvicorn.error")
 # Message unique renvoyé au visiteur quand Claude échoue : on ne révèle jamais
 # la cause (crédit épuisé, clé invalide...), qui renseignerait un attaquant.
 MESSAGE_INDISPONIBLE = "Le service est momentanément indisponible. Réessayez plus tard."
+
+# Message unique pour toute requête mal formée (question absente, vide, mauvais type...).
+MESSAGE_REQUETE_INVALIDE = (
+    'Requête invalide : envoyez une question non vide, sous la forme {"question": "..."}.'
+)
 
 
 @asynccontextmanager
@@ -73,6 +80,16 @@ app.add_middleware(LimiteTailleCorps)
 ajouter_cors(app, lire_origines_cors())
 
 
+@app.exception_handler(RequestValidationError)
+async def requete_invalide(request: Request, erreur: RequestValidationError):
+    """Remplace la réponse 422 par défaut de FastAPI par un message fixe.
+
+    Par défaut, FastAPI renvoie l'entrée reçue ("input") et des détails internes
+    de pydantic : un gros objet invalide serait renvoyé en entier au client.
+    """
+    return JSONResponse(status_code=422, content={"detail": MESSAGE_REQUETE_INVALIDE})
+
+
 # --- Schémas de données (validés automatiquement par pydantic) ---
 
 
@@ -101,7 +118,7 @@ class ChatResponse(BaseModel):
 
 
 class MessageErreur(BaseModel):
-    """Corps des erreurs levées par la route (429, 503) : {"detail": "..."}."""
+    """Corps de toutes les erreurs de /chat (413, 422, 429, 503) : {"detail": "..."}."""
 
     detail: str
 
@@ -151,11 +168,15 @@ def journaliser_erreur_claude(erreur: Exception) -> None:
 
 
 @app.get("/health")
-def health():
+async def health():
     """Route de santé appelée par Render pour vérifier que le service est vivant.
 
     Elle ne fait volontairement rien d'autre : pas d'appel à Claude (coûteux),
     pas de lecture de fichiers, pas de rate limit (Render doit toujours y accéder).
+
+    "async def" (contrairement à /chat) : elle ne fait aucune attente, donc elle n'a
+    pas besoin d'un thread. Même si tous les threads sont occupés par des appels
+    à Claude, /health répond toujours, et Render ne croit pas le service en panne.
     """
     return {"status": "ok"}
 
@@ -167,6 +188,9 @@ def health():
     # on les déclare pour qu'elles apparaissent dans /docs (et non en "Undocumented").
     responses={
         413: {"model": MessageErreur, "description": "Corps de la requête trop volumineux (plus de 8 Ko)"},
+        # Déclarer le 422 remplace le schéma par défaut de FastAPI (liste d'erreurs),
+        # qui ne correspond plus à ce que renvoie requete_invalide().
+        422: {"model": MessageErreur, "description": "Question absente, vide, mal formée ou trop longue"},
         429: {"model": MessageErreur, "description": "Trop de questions (limite par IP ou plafond global)"},
         503: {"model": MessageErreur, "description": "Claude est momentanément indisponible"},
     },

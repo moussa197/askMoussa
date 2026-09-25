@@ -15,6 +15,7 @@ VARIABLES = [
     "PLAFOND_GLOBAL_JOUR",
     "CORS_ORIGINES_DEV",
     "XFF_POSITION",
+    "RENDER",
 ]
 
 
@@ -103,6 +104,20 @@ def test_xff_position_invalide(monkeypatch):
     monkeypatch.setenv("XFF_POSITION", "abc")
     with pytest.raises(ValueError, match="XFF_POSITION"):
         charger_config()
+
+
+def test_xff_position_obligatoire_sur_render(monkeypatch):
+    # Render définit la variable RENDER : sans position, tous les visiteurs
+    # partageraient l'IP du répartiteur de charge.
+    monkeypatch.setenv("RENDER", "true")
+    with pytest.raises(ValueError, match="XFF_POSITION doit être définie sur Render"):
+        charger_config()
+
+
+def test_xff_position_definie_sur_render(monkeypatch):
+    monkeypatch.setenv("RENDER", "true")
+    monkeypatch.setenv("XFF_POSITION", "-1")
+    assert charger_config().xff_position == -1
 
 
 def test_cle_masquee_dans_repr(monkeypatch):

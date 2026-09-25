@@ -9,7 +9,7 @@ C'est une API **Python / FastAPI** qui s'appuie sur l'API **Claude** (modèle `c
 Quand un visiteur pose une question (`POST /chat`) :
 
 1. **CORS** : seul le portfolio est autorisé à appeler l'API depuis un navigateur.
-2. **Validation** : une question vide ou de plus de 500 caractères est refusée (422), sans appeler Claude.
+2. **Validation** : un corps de requête de plus de 8 Ko est refusé avant même d'être lu en entier (413). Une question vide ou de plus de 500 caractères est refusée (422). Dans les deux cas, Claude n'est pas appelé.
 3. **Limite de requêtes** : au-delà de 10 questions par minute ou 30 par jour pour une même IP, ou de 300 par jour au total, la question est refusée (429).
 4. **Prompt** : les règles du chatbot et les trois documents de `data/` sont envoyés à Claude avec la question.
 5. **Génération** : Claude rédige une réponse courte, dans la langue du visiteur, à partir des documents uniquement.
@@ -130,11 +130,9 @@ curl -X POST http://127.0.0.1:8000/chat -H "Content-Type: application/json" -d '
 |---|---|---|
 | 200 | Réponse de Claude | `{"answer": "..."}` |
 | 413 | Corps de la requête trop volumineux (plus de 8 Ko), refusé avant toute lecture complète | `{"detail": "La requête est trop volumineuse."}` |
-| 422 | Question absente, vide ou trop longue (plus de 500 caractères) | `{"detail": ...}` |
+| 422 | Question absente, vide, mal formée ou trop longue (plus de 500 caractères) | `{"detail": "..."}` (message fixe, l'entrée n'est jamais renvoyée) |
 | 429 | Trop de questions (limite par IP ou plafond global atteint) | `{"detail": "Trop de questions. Réessayez un peu plus tard."}` |
 | 503 | Claude est indisponible (panne, délai dépassé, crédits épuisés…) | `{"detail": "Le service est momentanément indisponible. Réessayez plus tard."}` |
-
-Dans les réponses 422, `detail` est une liste d'erreurs de validation si la question est absente ou vide, et un simple texte si elle est trop longue.
 
 ## Configuration
 
@@ -150,7 +148,7 @@ Toutes les variables se règlent dans `.env` en local, ou dans le tableau de bor
 | `RATE_LIMIT_PAR_JOUR` | `30` | Questions par 24 h pour une même IP |
 | `PLAFOND_GLOBAL_JOUR` | `300` | Questions par 24 h, tous visiteurs confondus |
 | `CORS_ORIGINES_DEV` | *(vide)* | Origines autorisées en plus du portfolio, séparées par des virgules (ex. `http://localhost:5500`). `*` est refusé |
-| `XFF_POSITION` | *(vide)* | Position de l'IP réelle du visiteur dans l'en-tête `X-Forwarded-For` derrière un proxy (`0`, `-1`, `-2`…). Vide : IP de la connexion |
+| `XFF_POSITION` | *(vide)* | Position de l'IP réelle du visiteur dans l'en-tête `X-Forwarded-For` derrière un proxy (`0`, `-1`, `-2`…). Vide : IP de la connexion (en local uniquement ; **obligatoire sur Render**) |
 
 Un nombre invalide, ou un `*` dans les origines, empêche le serveur de démarrer.
 

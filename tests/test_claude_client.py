@@ -1,5 +1,6 @@
 """Tests de app/claude_client.py. Faux client uniquement : AUCUN appel réseau."""
 
+import os
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -60,6 +61,13 @@ def test_reponse_sans_texte_refusee(blocs):
     client = faux_client(*blocs)
     with pytest.raises(ReponseClaudeVide):
         ClientClaude(CONFIG_TEST, client).demander("system", "question")
+
+
+def test_tests_isoles_de_la_vraie_api():
+    # Garanti par la fixture automatique de conftest.py : jamais la vraie clé,
+    # et un appel oublié partirait vers une adresse locale fermée (donc échouerait).
+    assert os.environ["ANTHROPIC_API_KEY"] == "test-key"
+    assert os.environ["ANTHROPIC_BASE_URL"] == "http://127.0.0.1:9"
 
 
 def test_vrai_client_cree_avec_la_config(monkeypatch):

@@ -28,6 +28,20 @@ CONFIG_TEST = Config(
 )
 
 
+@pytest.fixture(autouse=True)
+def isoler_de_la_vraie_api(monkeypatch):
+    """Appliquée automatiquement à TOUS les tests.
+
+    load_dotenv() a chargé la vraie clé du .env à l'import de app.config : on la
+    remplace par une fausse, et on redirige le SDK vers une adresse locale fermée.
+    Un futur test qui oublierait le faux client échouerait donc au lieu d'être facturé.
+    """
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://127.0.0.1:9")
+    # Les tests simulent un environnement local, jamais Render.
+    monkeypatch.delenv("RENDER", raising=False)
+
+
 class FauxClientClaude:
     """Remplace ClientClaude : enregistre les appels et renvoie une réponse fixe.
 

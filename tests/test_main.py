@@ -14,6 +14,7 @@ from app.claude_client import ReponseClaudeVide
 from app.config import lire_origines_cors
 from app.main import (
     MESSAGE_INDISPONIBLE,
+    MESSAGE_REQUETE_INVALIDE,
     ajouter_cors,
     app,
     obtenir_config,
@@ -267,6 +268,41 @@ def test_reponses_413_429_et_503_documentees():
     assert "413" in reponses
     assert "429" in reponses
     assert "503" in reponses
+
+
+# --- 422 neutre (revue de sécurité, n°8) ---
+
+
+@pytest.mark.parametrize(
+    "corps",
+    [
+        {},  # question absente
+        {"question": "   "},  # question vide
+        {"question": ["ENTREE-RENVOYEE"] * 50},  # mauvais type
+        {"question": 12345},  # mauvais type
+    ],
+)
+def test_422_message_fixe_sans_renvoyer_l_entree(faux_client_claude, corps):
+    reponse = client.post("/chat", json=corps)
+    assert reponse.status_code == 422
+    assert reponse.json() == {"detail": MESSAGE_REQUETE_INVALIDE}
+    assert "ENTREE-RENVOYEE" not in reponse.text
+    assert faux_client_claude.appels == []
+
+
+def test_json_mal_forme_refuse(faux_client_claude):
+    reponse = client.post(
+        "/chat", content=b'{"question": ', headers={"Content-Type": "application/json"}
+    )
+    assert reponse.status_code == 422
+    assert reponse.json() == {"detail": MESSAGE_REQUETE_INVALIDE}
+
+
+def test_422_documente_avec_le_bon_format():
+    reponses = client.get("/openapi.json").json()["paths"]["/chat"]["post"]["responses"]
+    assert reponses["422"]["content"]["application/json"]["schema"]["$ref"].endswith(
+        "/MessageErreur"
+    )
 
 
 # --- Taille du corps (revue de sécurité, n°1) ---

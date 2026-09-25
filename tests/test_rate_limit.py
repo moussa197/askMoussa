@@ -3,6 +3,7 @@
 from types import SimpleNamespace
 
 import pytest
+from starlette.datastructures import Headers
 
 from app.rate_limit import UN_JOUR, LimiteurRequetes, obtenir_ip_client
 
@@ -113,9 +114,14 @@ def test_ip_expirees_oubliees(horloge):
 
 
 def fausse_requete(xff=None, ip_connexion="5.5.5.5"):
-    """Imite une requête Starlette : request.client.host et request.headers."""
-    headers = {"x-forwarded-for": xff} if xff is not None else {}
-    return SimpleNamespace(client=SimpleNamespace(host=ip_connexion), headers=headers)
+    """Imite une requête Starlette : request.client.host et request.headers.
+
+    `xff` : une chaîne (une ligne d'en-tête) ou une liste (plusieurs lignes séparées).
+    On utilise les vrais Headers de Starlette, qui gèrent les en-têtes répétés.
+    """
+    lignes = [] if xff is None else ([xff] if isinstance(xff, str) else xff)
+    brut = [(b"x-forwarded-for", ligne.encode()) for ligne in lignes]
+    return SimpleNamespace(client=SimpleNamespace(host=ip_connexion), headers=Headers(raw=brut))
 
 
 def test_ip_sans_position_configuree():
@@ -139,3 +145,11 @@ def test_ip_selon_la_position(position, attendu):
 def test_ip_position_hors_limites():
     requete = fausse_requete(xff="1.2.3.4")
     assert obtenir_ip_client(requete, -3) == "5.5.5.5"
+
+
+def test_ip_plusieurs_lignes_x_forwarded_for():
+    # Le visiteur envoie sa propre ligne, le proxy en ajoute une seconde :
+    # -1 doit désigner l'IP ajoutée par le proxy, pas celle du visiteur.
+    requete = fausse_requete(xff=["1.2.3.4", "8.8.8.8"])
+    assert obtenir_ip_client(requete, -1) == "8.8.8.8"
+    assert obtenir_ip_client(requete, 0) == "1.2.3.4"

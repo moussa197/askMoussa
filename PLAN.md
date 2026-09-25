@@ -137,7 +137,8 @@ Navigateur (moussa197.github.io)
 │    > 10/min ou > 30/jour pour cette IP ? ──► 429             │
 │    > 300/jour au total ?               ──► 429               │
 ├──────────────────────────────────────────────────────────────┤
-│ 3. Validation pydantic : vide ou > 500 caractères ? ──► 422  │
+│ 3. Corps > 8 Ko ? ──► 413 (avant lecture complète)           │
+│    Validation pydantic : vide ou > 500 caractères ? ──► 422  │
 │    (Claude n'est jamais appelé dans ce cas)                  │
 ├──────────────────────────────────────────────────────────────┤
 │ 4. RECHERCHE (Retrieval)                                     │
@@ -184,8 +185,8 @@ Les étapes 4, 5 et 6 sont les trois lettres de **RAG** : *Retrieval* (on récup
 - Il y a de plus deux couches de proxy (Cloudflare puis Render). Le **dernier** élément pourrait donc être une IP de Cloudflare et non celle du visiteur. « Prendre le dernier » n'est pas forcément plus juste que « prendre le premier ».
 
 **Conclusion.** On ne code pas une position « au hasard ». On la **mesure** au premier déploiement (étape 13) :
-1. On déploie avec un journal temporaire qui affiche `X-Forwarded-For` (ainsi que `CF-Connecting-IP` et `True-Client-IP` s'ils existent), **jamais la question**.
-2. On appelle l'API avec un en-tête falsifié : `curl.exe -H "X-Forwarded-For: 1.2.3.4" https://<service>.onrender.com/health`.
+1. On déploie avec un journal temporaire qui affiche `X-Forwarded-For` (ainsi que `CF-Connecting-IP` et `True-Client-IP` s'ils existent), **jamais la question**. Comme `config.py` refuse une `XFF_POSITION` vide sur Render (revue de sécurité, n°2), on met une valeur **provisoire** (`-1`) le temps de la mesure.
+2. On appelle l'API avec un en-tête falsifié : `curl.exe -H "X-Forwarded-For: 1.2.3.4" https://<service>.onrender.com/health`. On refait l'essai avec **deux lignes** `X-Forwarded-For` séparées, pour vérifier que `getlist()` les recolle dans le bon ordre.
 3. On compare avec sa vraie IP publique (visible sur un site comme ifconfig.me) :
    - si `1.2.3.4` apparaît **en premier** et la vraie IP **plus loin**, le premier élément est falsifiable. On prend la position fixe de la vraie IP, comptée **depuis la fin** ;
    - si Render a remplacé `1.2.3.4` par la vraie IP en première position, le premier élément est fiable.
@@ -253,7 +254,7 @@ Commandes utiles sous Windows :
 | 12b-1 | BM25 en Python pur : découpage par `##`, tokenisation, IDF, score, top-k | `retrieval.py` | `test_retrieval.py` : découpage correct d'un petit Markdown ; tokenisation (minuscules, accents, mots vides) ; IDF plus élevé pour un mot rare ; la section attendue arrive 1ʳᵉ sur un mini-corpus ; aucun résultat si aucun mot commun | Afficher les sections retenues pour 2 ou 3 questions | `feat(recherche): ajouter une recherche BM25` |
 | 12b-2 | Choix du mode via `MODE_RECHERCHE` (`complet` / `bm25`) | `config.py`, `prompt.py`, `main.py` | Mode `complet` : prompt identique à avant ; mode `bm25` : seules les sections choisies sont dans le prompt ; valeur inconnue → erreur au démarrage | Relancer avec `MODE_RECHERCHE=bm25` et comparer dans `/docs` | `feat(recherche): choisir le mode par variable` |
 | 12b-3 | Script de comparaison A vs BM25 sur 10 questions | `scripts/comparer_recherche.py` | `test_comparer_recherche.py` : faux client ; les 10 questions sont posées dans les 2 modes ; le rapport contient réponses, sections et tokens | `python scripts/comparer_recherche.py` (vrais appels), puis analyser les résultats ensemble | `feat(recherche): comparer les modes A et BM25` |
-| 13 | Déploiement Render : Web Service Python ; Build `pip install -r requirements.txt` ; Start `uvicorn app.main:app --host 0.0.0.0 --port $PORT` ; `ANTHROPIC_API_KEY` dans le tableau de bord ; Health Check Path `/health` ; `MODE_RECHERCHE=complet` ; **mesure de `XFF_POSITION`** (§4.3) | configuration Render | La suite pytest passe avant le déploiement | `curl.exe https://<service>.onrender.com/health` ; un POST `/chat` ; test d'en-tête falsifié (§4.3) ; RAM dans *Metrics* (~100 Mo attendus) ; démarrage à froid de ~30 à 60 s après la veille | `build(render): configurer le déploiement Render` |
+| 13 | Déploiement Render : Web Service Python ; Build `pip install -r requirements.txt` ; Start `uvicorn app.main:app --host 0.0.0.0 --port $PORT` ; `ANTHROPIC_API_KEY` dans le tableau de bord ; Health Check Path `/health` ; `MODE_RECHERCHE=complet` ; **mesure de `XFF_POSITION`** (§4.3). Issu de la revue de sécurité : **clé dédiée** dans un workspace Anthropic séparé avec une limite de dépense basse, vérifiée avant la mise en ligne ; **désactiver `/docs`, `/redoc` et `/openapi.json`** en production (variable d'activation, adapter le test OpenAPI) ; **`CORS_ORIGINES_DEV` vide** ; ne **jamais** définir `FORWARDED_ALLOW_IPS="*"` ni `ANTHROPIC_LOG=debug` | configuration Render | La suite pytest passe avant le déploiement | `curl.exe https://<service>.onrender.com/health` ; un POST `/chat` ; test d'en-tête falsifié (§4.3) ; RAM dans *Metrics* (~100 Mo attendus) ; démarrage à froid de ~30 à 60 s après la veille | `build(render): configurer le déploiement Render` |
 | 14 | *(dépôt du portfolio)* Widget de chat : `fetch` POST `/chat`, messages clairs pour 422, 429 et 503, message « le serveur se réveille… ». Réponse affichée avec **`textContent`, jamais `innerHTML`** (aucune injection de code possible) et CSS **`white-space: pre-line`** (retours à la ligne respectés). Pas de bibliothèque de rendu Markdown : le prompt impose du texte simple | dépôt `moussa197.github.io` | — | Tester depuis le vrai site | `feat(chat): intégrer le widget Ask Moussa` |
 
 ---
@@ -264,3 +265,13 @@ Commandes utiles sous Windows :
 - **Un seul worker uvicorn.** Sinon, chaque processus aurait son propre limiteur, et la RAM serait multipliée.
 - **Journaux :** aucune question de visiteur n'est enregistrée. Les journaux d'accès d'uvicorn contiennent le chemin, le code HTTP et l'IP, mais pas le corps de la requête.
 - **Noms de fichiers en minuscules** partout (Render tourne sous Linux, qui est sensible à la casse).
+
+## 8. Revue de sécurité : compromis acceptés
+
+Une revue de sécurité a été faite après l'étape 11. Les corrections nécessaires avant le déploiement ont été faites : corps limité à 8 Ko (413), fausse clé forcée dans les tests, `/health` en `async`, 422 neutre, `XFF_POSITION` obligatoire sur Render avec lecture de toutes les lignes `X-Forwarded-For`. Les points restants sont listés à l'étape 13. Ces trois points sont **acceptés en connaissance de cause** :
+
+- **Plafond global utilisable pour un déni de service** (n°3). Avec plusieurs IP (VPN, IPv6), un attaquant peut épuiser les 300 questions du jour et bloquer le chatbot pour tous jusqu'au lendemain. On préfère un coût plafonné à une disponibilité garantie. Pistes si des abus apparaissent : regrouper les IPv6 par préfixe /64, Cloudflare Turnstile.
+- **Dépendances indirectes non fixées** (n°9). Starlette, pydantic, httpx2… sont choisies par pip à chaque build. Piste : un fichier de versions verrouillées et `pip-audit`, avant ou juste après le déploiement.
+- **Nouvelle tentative facturée deux fois** (n°12). Avec `max_retries=1`, un appel qui expire côté client mais aboutit chez Anthropic peut être facturé deux fois. L'impact est borné (au pire le double) ; le passer à `0` donnerait plus de 503.
+
+Point à traiter par Moussa, hors code (n°11) : le projet est dans un dossier **OneDrive**, donc `.env` est copié dans le cloud Microsoft. Utiliser une **clé dédiée à ce projet**, facile à révoquer, ou sortir le projet d'OneDrive.

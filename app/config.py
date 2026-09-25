@@ -87,9 +87,19 @@ def lire_origines_cors() -> tuple[str, ...]:
 
 
 def _lire_xff_position() -> int | None:
-    """Position de l'IP réelle dans X-Forwarded-For. Vide → None (pas encore mesurée)."""
+    """Position de l'IP réelle dans X-Forwarded-For. Vide → None (IP de la connexion).
+
+    Sur Render (variable RENDER définie par l'hébergeur), la valeur vide est refusée :
+    l'IP de la connexion y est celle du répartiteur de charge, la même pour tous les
+    visiteurs, qui partageraient alors un seul compteur du rate limit.
+    """
     texte = _lire_texte("XFF_POSITION")
     if texte == "":
+        if _lire_texte("RENDER") != "":
+            raise ValueError(
+                "XFF_POSITION doit être définie sur Render (ex. -1), sinon tous les "
+                "visiteurs partagent la même IP. Voir PLAN.md §4.3."
+            )
         return None
     try:
         return int(texte)
