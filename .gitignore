@@ -1,0 +1,29 @@
+# Secrets (clé API) — ne jamais commiter
+.env
+.env.*
+!.env.example
+
+# Environnements virtuels
+venv/
+.venv/
+env/
+
+# Fichiers compilés Python
+__pycache__/
+*.py[cod]
+
+# Tests et couverture
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+
+# Éditeurs et système
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
