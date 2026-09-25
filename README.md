@@ -129,6 +129,7 @@ curl -X POST http://127.0.0.1:8000/chat -H "Content-Type: application/json" -d '
 | Code | Signification | Corps |
 |---|---|---|
 | 200 | Réponse de Claude | `{"answer": "..."}` |
+| 413 | Corps de la requête trop volumineux (plus de 8 Ko), refusé avant toute lecture complète | `{"detail": "La requête est trop volumineuse."}` |
 | 422 | Question absente, vide ou trop longue (plus de 500 caractères) | `{"detail": ...}` |
 | 429 | Trop de questions (limite par IP ou plafond global atteint) | `{"detail": "Trop de questions. Réessayez un peu plus tard."}` |
 | 503 | Claude est indisponible (panne, délai dépassé, crédits épuisés…) | `{"detail": "Le service est momentanément indisponible. Réessayez plus tard."}` |
@@ -176,6 +177,7 @@ askMoussa/
 │   ├── prompt.py          # Règles du chatbot, documents balisés, question balisée
 │   ├── claude_client.py   # Seul point d'appel à l'API Claude
 │   ├── rate_limit.py      # Limites par IP et plafond global, IP du visiteur
+│   ├── limite_corps.py    # Refus (413) des corps de requête de plus de 8 Ko
 │   └── main.py            # Application FastAPI : CORS, routes /health et /chat, erreurs
 ├── data/                  # Base de connaissances : cv.md, faq.md, projets.md
 ├── tests/                 # Tests pytest (un fichier par module, sans appel réel)

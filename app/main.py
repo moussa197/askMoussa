@@ -14,6 +14,7 @@ from pydantic import BaseModel, field_validator
 from app.claude_client import ClientClaude, ReponseClaudeVide
 from app.config import Config, charger_config, lire_origines_cors
 from app.documents import charger_documents
+from app.limite_corps import LimiteTailleCorps
 from app.prompt import construire_prompt_systeme
 from app.rate_limit import LimiteurRequetes, obtenir_ip_client
 
@@ -64,8 +65,11 @@ def ajouter_cors(app: FastAPI, origines) -> None:
 
 # Objet application que lance uvicorn ("app.main:app").
 app = FastAPI(title="Ask Moussa", lifespan=lifespan)
-# Le middleware doit être ajouté AVANT le démarrage (donc pas dans lifespan) :
-# on lit ici les origines, ce qui n'exige pas la clé API.
+# Les middlewares doivent être ajoutés AVANT le démarrage (donc pas dans lifespan).
+# Le dernier ajouté est le plus externe : la limite de taille est ajoutée avant le CORS,
+# pour que le CORS l'enveloppe et que la réponse 413 garde ses en-têtes CORS.
+app.add_middleware(LimiteTailleCorps)
+# On lit ici les origines, ce qui n'exige pas la clé API.
 ajouter_cors(app, lire_origines_cors())
 
 
@@ -162,6 +166,7 @@ def health():
     # Réponses levées par HTTPException dans la route : FastAPI ne peut pas les deviner,
     # on les déclare pour qu'elles apparaissent dans /docs (et non en "Undocumented").
     responses={
+        413: {"model": MessageErreur, "description": "Corps de la requête trop volumineux (plus de 8 Ko)"},
         429: {"model": MessageErreur, "description": "Trop de questions (limite par IP ou plafond global)"},
         503: {"model": MessageErreur, "description": "Claude est momentanément indisponible"},
     },

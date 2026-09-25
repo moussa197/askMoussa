@@ -261,11 +261,33 @@ def test_bug_de_notre_code_reste_une_erreur_500(faux_client_claude):
     assert reponse.status_code == 500
 
 
-def test_reponses_429_et_503_documentees():
+def test_reponses_413_429_et_503_documentees():
     # Elles doivent apparaître dans /docs (schéma OpenAPI), et non en "Undocumented".
     reponses = client.get("/openapi.json").json()["paths"]["/chat"]["post"]["responses"]
+    assert "413" in reponses
     assert "429" in reponses
     assert "503" in reponses
+
+
+# --- Taille du corps (revue de sécurité, n°1) ---
+
+
+def test_corps_trop_gros_refuse_avant_claude(faux_client_claude):
+    reponse = client.post("/chat", json={"question": "a" * 10_000})  # environ 10 Ko
+    assert reponse.status_code == 413
+    assert reponse.json() == {"detail": "La requête est trop volumineuse."}
+    assert faux_client_claude.appels == []
+
+
+def test_413_garde_les_entetes_cors(faux_client_claude):
+    # Le CORS enveloppe la limite de taille : le widget peut lire ce code d'erreur.
+    reponse = client.post(
+        "/chat",
+        json={"question": "a" * 10_000},
+        headers={"Origin": "https://moussa197.github.io"},
+    )
+    assert reponse.status_code == 413
+    assert reponse.headers["access-control-allow-origin"] == "https://moussa197.github.io"
 
 
 # --- Démarrage (lifespan) ---
