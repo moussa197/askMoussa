@@ -43,7 +43,7 @@ Contenu de la formation :
 - Coordination d'équipe et échanges avec les élèves et l'administration.
 
 ## Langues
-<!-- À COMPLÉTER : par ex. Français (courant), Anglais (niveau ?), autres langues parlées -->
-
+- Français Natif 
+- Anglais B1
 ## Centres d'intérêt
 Informatique, échecs, sport, jeux vidéo, anime et manga.

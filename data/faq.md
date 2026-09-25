@@ -1,12 +1,5 @@
 # Questions fréquentes sur Moussa Keita
 
-<!--
-MODE D'EMPLOI (supprime ce bloc quand tu as fini)
-- Réponds à chaque question avec tes propres mots, en 2 à 5 phrases, à la 3e personne.
-- Les réponses déjà écrites viennent de ton CV : vérifie-les.
-- Si une question ne te concerne pas, supprime-la.
-- Tout ce qui est ici sera lisible par n'importe quel visiteur : rien de privé.
--->
 
 ## Qui est Moussa ?
 Moussa Keita est étudiant en Bachelor Informatique et Intelligence Artificielle à l'ESEO, à Angers. Il s'intéresse au développement d'applications, en particulier web, et souhaite se spécialiser progressivement dans la Data et l'IA.
