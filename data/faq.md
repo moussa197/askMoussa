@@ -25,7 +25,7 @@ Moussa aime les environnements variés où il peut travailler sur plusieurs suje
 - Polyvalent : il aime mener plusieurs tâches de front et toucher à différents aspects d'un projet.
 
 ## A-t-il déjà travaillé en équipe ?
-Oui, régulièrement : à l'ESEO, de nombreux projets se font en équipe. Moussa a notamment développé en équipe de quatre la plateforme de jeux Letterix pour son cours de web, avec Git, GitHub, Trello et des réunions régulières selon une méthode inspirée de l'Agile. Il y a codé la plupart des pages et réalisé l'essentiel du design. Il a aussi été vice-président du Bureau des Élèves de son lycée à Dakar de 2022 à 2024, où il participait à la gestion du budget et à la coordination de l'équipe.
+Oui, régulièrement : à l'ESEO, de nombreux projets se font en équipe. Moussa a notamment développé en équipe de quatre la plateforme de jeux Letterix pour son cours de web, avec Git, GitHub, Trello et des réunions régulières selon une méthode inspirée de l'Agile. Il y a codé la plupart des pages et réalisé l'essentiel du design. Pour son projet de fin de semestre, MemoMakerr, une application Java développée en équipe de quatre en méthode Agile avec Git et Trello, il a alterné entre les rôles de product manager, Scrum Master, lead développeur et développeur. Il a aussi été vice-président du Bureau des Élèves de son lycée à Dakar de 2022 à 2024, où il participait à la gestion du budget et à la coordination de l'équipe.
 
 ## Quelles technologies maîtrise-t-il le mieux ?
 Le domaine que Moussa maîtrise le mieux est le développement web : HTML, CSS, JavaScript, PHP et MySQL, qu'il a utilisés dans plusieurs projets concrets (Letterix, site de restaurant, portfolio).

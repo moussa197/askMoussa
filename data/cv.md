@@ -33,6 +33,7 @@ Contenu de la formation :
 
 ## Projets (résumé — détails dans projets.md)
 - Ask Moussa : chatbot IA (RAG) en Python/FastAPI qui répond aux questions sur son parcours, intégré à son portfolio.
+- MemoMakerr : application de bureau de souvenirs de voyage (carte interactive, timeline, statistiques, bilan annuel partageable) développée en équipe de 4 comme projet de fin de semestre à l'ESEO, où il a alterné entre les rôles de product manager, Scrum Master, lead développeur et développeur (Java 21, JavaFX, MySQL, Leaflet.js, JUnit 5).
 - Letterix (Jeu de Mots Interactif) : plateforme de jeux de lettres (Motus et mots mêlés) développée en équipe de 4 pour le cours de web de l'ESEO (PHP, MySQL, HTML, CSS, JavaScript).
 - Site de Restaurant Responsive : site vitrine avec menu, galerie et formulaire de réservation (HTML, CSS, JavaScript).
 - Portfolio Personnel : développé et déployé sur GitHub Pages avec un domaine personnalisé (HTML, CSS, JavaScript).

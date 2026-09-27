@@ -9,6 +9,25 @@ Moussa a conçu un chatbot intégré à son portfolio qui répond aux questions 
 
 Moussa a mené ce projet en tant que superviseur d'un flux de développement assisté par IA (Claude Code et ses agents) : il a défini l'architecture, validé chaque étape, relu et testé le code, et géré lui-même les commits. Le projet comprend des tests automatisés, une protection de la clé API, une limite de requêtes et une protection contre les tentatives de détournement du chatbot.
 
+## MemoMakerr — application de bureau de souvenirs de voyage
+- Technologies : Java 21, JavaFX (FXML, CSS), MySQL, JDBC, Maven, Leaflet.js, OpenStreetMap, Gson, BCrypt, JUnit 5, Javadoc
+- Type : projet de groupe de fin de semestre, réalisé à l'ESEO pendant la première année de Bachelor (année universitaire 2025-2026)
+- Équipe : 4 étudiants
+
+MemoMakerr est une application de bureau destinée aux voyageurs, développée en équipe de quatre. Elle permet de créer des voyages, d'y ajouter des souvenirs associés à des lieux, avec des photos et une émotion (joie, nostalgie, amour, aventure, tristesse), puis de revoir son historique sur une carte interactive, une timeline et des statistiques.
+
+Fonctionnalités : création de compte et connexion, gestion des voyages et des souvenirs, galerie de photos, recherche de villes, carte interactive avec des marqueurs colorés selon l'émotion et le tracé de l'itinéraire entre les étapes, timeline chronologique, fonctionnalité « Ce jour-là » qui retrouve les souvenirs vécus à la même date les années précédentes, badges, espace d'administration, et un bilan annuel façon « Wrapped » partageable sous forme de page web.
+
+Aspects techniques : l'application suit une architecture MVC. Les écrans FXML passent par des contrôleurs JavaFX, qui appellent des services métier, eux-mêmes reliés à la base MySQL par des DAO et des requêtes SQL préparées. La carte est réalisée avec Leaflet.js et OpenStreetMap, intégrée dans l'application JavaFX, et la recherche de villes utilise l'API Nominatim d'OpenStreetMap. Les statistiques comprennent le nombre de pays visités, les émotions dominantes, le mois le plus actif et la distance totale parcourue, calculée avec la formule de Haversine. Le bilan annuel est converti en JSON puis encodé dans une URL de partage, sans jamais inclure les chemins locaux des photos.
+
+Sécurité et qualité : les mots de passe sont hachés avec BCrypt, l'application gère les sessions et les rôles des utilisateurs, et le projet comprend des tests unitaires JUnit 5 ainsi qu'une documentation Javadoc.
+
+Rôle de Moussa : Moussa a occupé plusieurs rôles au fil du projet, en alternant entre product manager, Scrum Master, lead développeur et développeur. En tant que product manager, il a contribué à définir les fonctionnalités et leurs priorités ; en tant que Scrum Master, il a animé l'organisation de l'équipe et le suivi des tâches ; en tant que lead développeur et développeur, il a participé aux choix techniques et au développement de l'application.
+
+Organisation : l'équipe a travaillé selon la méthode Agile. Le code était partagé et versionné avec Git, et les tâches étaient réparties et suivies sur un tableau Trello.
+
+Ce que Moussa a appris : passer d'un rôle à l'autre au sein d'une même équipe, de la vision produit à l'organisation du travail et au développement ; mener un projet en méthode Agile de la conception à la livraison ; structurer une application Java complète en architecture MVC, avec une base de données MySQL ; et intégrer des outils externes, comme une carte interactive et une API de géolocalisation, dans une application de bureau.
+
 ## Letterix — plateforme de jeux de lettres (Motus et mots mêlés)
 - Technologies : PHP, MySQL, SQL, JavaScript, HTML, CSS
 - Type : projet de groupe réalisé dans le cadre du cours de développement web à l'ESEO
