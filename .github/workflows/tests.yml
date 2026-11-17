@@ -18,3 +18,9 @@ jobs:
       # Aucune clé API nécessaire : les tests utilisent un faux client Claude.
       - name: Run tests
         run: python -m pytest -v
+    docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t ask-moussa .
