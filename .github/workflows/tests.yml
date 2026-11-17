@@ -18,7 +18,7 @@ jobs:
       # Aucune clé API nécessaire : les tests utilisent un faux client Claude.
       - name: Run tests
         run: python -m pytest -v
-    docker:
+  docker:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
