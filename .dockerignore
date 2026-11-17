@@ -1,0 +1,17 @@
+# Secrets : la clé API ne doit JAMAIS entrer dans l'image
+.env
+.env.*
+
+# Environnements virtuels et fichiers compilés
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Inutile pour faire tourner l'API
+.git/
+.github/
+.pytest_cache/
+tests/
+.vscode/
+.idea/

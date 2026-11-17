@@ -82,6 +82,16 @@ Quand le terminal affiche `Application startup complete.`, ouvrez **http://127.0
 
 Si la clé est absente ou qu'un document de `data/` manque, le serveur refuse de démarrer et affiche un message explicite.
 
+## Lancer avec Docker
+
+Prérequis : Docker Desktop lancé, et un fichier `.env` rempli à partir de `.env.example`.
+
+docker build -t ask-moussa .
+docker run --rm --env-file .env -p 8000:8000 ask-moussa
+
+L'API répond ensuite sur http://localhost:8000/health.
+La clé API n'est jamais copiée dans l'image : elle est transmise au lancement avec `--env-file`.
+
 ## Tests
 
 ```powershell

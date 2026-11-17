@@ -102,6 +102,16 @@ uvicorn app.main:app --reload
 
 Then open **http://127.0.0.1:8000/docs** to try the API in your browser.
 
+## Run with Docker
+
+Requirements: Docker Desktop running, and a `.env` file filled in from `.env.example`.
+
+docker build -t ask-moussa .
+docker run --rm --env-file .env -p 8000:8000 ask-moussa
+
+The API then answers at http://localhost:8000/health.
+The API key is never copied into the image: it is passed at startup with `--env-file`.
+
 ### Tests
 
 ```bash
